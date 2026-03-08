@@ -2,6 +2,7 @@ import {
   Controller,
   Post,
   Get,
+  Patch,
   Body,
   UseGuards,
   HttpCode,
@@ -13,68 +14,71 @@ import {
   ApiResponse,
   ApiBearerAuth,
 } from '@nestjs/swagger';
+
 import { AuthService } from './auth.service';
-import { RegisterDto, LoginDto, AuthResponseDto } from './dto/auth.dto';
+import {
+  RegisterDto,
+  LoginDto,
+  ChangePasswordDto,
+  AuthResponseDto,
+} from './dto/auth.dto';
+
 import { JwtAuthGuard } from '../common/guards/jwt-auth.guard';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
 import { User } from '../users/user.entity';
 
-@ApiTags('Auth — Autentifikatsiya') // Swagger da guruh nomi
+@ApiTags('Auth')
 @Controller('auth')
 export class AuthController {
-  constructor(private authService: AuthService) {}
+  constructor(private readonly authService: AuthService) {}
 
-  // ========================
-  // POST /auth/register
-  // ========================
+  // REGISTER
   @Post('register')
   @ApiOperation({
-    summary: 'Ro\'yxatdan o\'tish',
-    description: 'Yangi foydalanuvchi yaratadi va JWT token qaytaradi',
+    summary: "Ro'yxatdan o'tish",
+    description:
+      "Yangi foydalanuvchi yaratadi va JWT token qaytaradi",
   })
-  @ApiResponse({
-    status: 201,
-    description: 'Muvaffaqiyatli ro\'yxatdan o\'tildi',
-    type: AuthResponseDto,
-  })
-  @ApiResponse({ status: 409, description: 'Bu email allaqachon mavjud' })
-  @ApiResponse({ status: 400, description: 'Ma\'lumotlar noto\'g\'ri' })
-  async register(@Body() dto: RegisterDto): Promise<AuthResponseDto> {
+  @ApiResponse({ status: 201, type: AuthResponseDto })
+  @ApiResponse({ status: 409, description: 'Email mavjud' })
+  register(@Body() dto: RegisterDto): Promise<AuthResponseDto> {
     return this.authService.register(dto);
   }
 
-  // ========================
-  // POST /auth/login
-  // ========================
+  // LOGIN
   @Post('login')
-  @HttpCode(HttpStatus.OK) // Default 201 emas, 200 qaytarsin
+  @HttpCode(HttpStatus.OK)
   @ApiOperation({
     summary: 'Tizimga kirish',
-    description: 'Email va parol bilan kirish, JWT token olish',
   })
-  @ApiResponse({
-    status: 200,
-    description: 'Muvaffaqiyatli kirildi',
-    type: AuthResponseDto,
-  })
-  @ApiResponse({ status: 401, description: 'Email yoki parol noto\'g\'ri' })
-  async login(@Body() dto: LoginDto): Promise<AuthResponseDto> {
+  @ApiResponse({ status: 200, type: AuthResponseDto })
+  @ApiResponse({ status: 401, description: "Email yoki parol noto'g'ri" })
+  login(@Body() dto: LoginDto): Promise<AuthResponseDto> {
     return this.authService.login(dto);
   }
 
-  // ========================
-  // GET /auth/me  (himoyalangan)
-  // ========================
+  // ME
   @Get('me')
-  @UseGuards(JwtAuthGuard)        // JWT token talab qilinadi
-  @ApiBearerAuth()                 // Swagger da "Authorize" tugmasi
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
   @ApiOperation({
     summary: 'Mening profilim',
-    description: 'Token orqali joriy foydalanuvchi ma\'lumotlarini olish',
   })
-  @ApiResponse({ status: 200, description: 'Profil ma\'lumotlari' })
-  @ApiResponse({ status: 401, description: 'Token yo\'q yoki yaroqsiz' })
-  async getMe(@CurrentUser() user: User) {
+  getMe(@CurrentUser() user: User) {
     return this.authService.getMe(user.id);
+  }
+
+  // CHANGE PASSWORD
+  @Patch('change-password')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @ApiOperation({
+    summary: "Parolni o'zgartirish",
+  })
+  changePassword(
+    @CurrentUser() user: User,
+    @Body() dto: ChangePasswordDto,
+  ) {
+    return this.authService.changePassword(user.id, dto);
   }
 }

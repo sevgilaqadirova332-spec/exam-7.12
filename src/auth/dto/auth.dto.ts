@@ -1,77 +1,77 @@
 import { ApiProperty } from '@nestjs/swagger';
 import {
-  IsEmail,
-  IsString,
-  MinLength,
-  IsEnum,
-  IsOptional,
-  Matches,
+  IsEmail, IsString, MinLength, IsEnum,
+  IsOptional, Matches,
 } from 'class-validator';
 import { UserRole } from '../../users/user.entity';
 
-// === RO'YXATDAN O'TISH ===
+// ===========================
+// Ro'yxatdan o'tish
+// ===========================
 export class RegisterDto {
-  @ApiProperty({ example: 'sevgilaqadirova@gmail.com', description: 'Email manzil' })
-  @IsEmail({}, { message: 'Email noto\'g\'ri formatda' })
+  @ApiProperty({ example: 'sevgilaqadirova@gmail.com' })
+  @IsEmail({}, { message: 'To\'g\'ri email kiriting' })
   email: string;
 
-  @ApiProperty({ example: 'sevgilaqadirova', description: 'Ism' })
+  @ApiProperty({ example: 'sevgi' })
   @IsString()
   firstName: string;
 
-  @ApiProperty({ example: 'sevgilaqadirova', description: 'Familiya' })
+  @ApiProperty({ example: 'qadirova' })
   @IsString()
   lastName: string;
 
-  @ApiProperty({ example: '+998953484246', required: false })
+  @ApiProperty({ example: '+998953484246', required: false, description: 'Xorazm: +99861, +99862' })
   @IsOptional()
-  @Matches(/^\+998[0-9]{9}$/, { message: 'O\'zbek telefon raqami kiriting: +998XXXXXXXXX' })
+  @Matches(/^\+998[0-9]{9}$/, { message: 'Format: +998XXXXXXXXX' })
   phone?: string;
 
   @ApiProperty({
-    example: 'jobseeker',
     enum: UserRole,
-    description: 'Rol: jobseeker (ish izlovchi) yoki employer (ish beruvchi)',
+    example: UserRole.JOBSEEKER,
+    description: 'jobseeker = ish izlovchi | employer = ish beruvchi',
   })
   @IsEnum(UserRole)
   role: UserRole;
 
-  @ApiProperty({ example: 'Parol123!', description: 'Kamida 6 ta belgi' })
+  @ApiProperty({ example: 'Parol@123', minLength: 6 })
   @IsString()
-  @MinLength(6, { message: 'Parol kamida 6 ta belgidan iborat bo\'lishi kerak' })
+  @MinLength(6, { message: 'Parol kamida 6 ta belgi bo\'lishi kerak' })
   password: string;
 }
 
-// === KIRISH ===
 export class LoginDto {
   @ApiProperty({ example: 'sevgilaqadirova@gmail.com' })
-  @IsEmail({}, { message: 'Email noto\'g\'ri' })
+  @IsEmail({}, { message: 'To\'g\'ri email kiriting' })
   email: string;
 
-  @ApiProperty({ example: 'Parol123!' })
+  @ApiProperty({ example: 'Parol@123' })
   @IsString()
   password: string;
 }
 
-// === JAVOB (Response) ===
+export class ChangePasswordDto {
+  @ApiProperty({ example: 'EskiParol@123' })
+  @IsString()
+  oldPassword: string;
+
+  @ApiProperty({ example: 'YangiParol@456', minLength: 6 })
+  @IsString()
+  @MinLength(6)
+  newPassword: string;
+}
+
 export class AuthResponseDto {
-  @ApiProperty({ description: 'JWT access token' })
+  @ApiProperty({ description: 'JWT access token — har so\'rovda Authorization headerga qo\'shing' })
   accessToken: string;
 
-  @ApiProperty({
-    description: 'Foydalanuvchi ma\'lumotlari',
-    example: {
-      id: 'uuid-...',
-      email: 'sevgilaqadirova@gmail.com',
-      firstName: 'sevgi',
-      role: 'jobseeker',
-    },
-  })
+  @ApiProperty()
   user: {
     id: string;
     email: string;
     firstName: string;
     lastName: string;
     role: string;
+    city: string;
   };
 }

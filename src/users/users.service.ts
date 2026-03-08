@@ -1,4 +1,9 @@
-import { Injectable, ConflictException, NotFoundException } from '@nestjs/common';
+import {
+  Injectable,
+  ConflictException,
+  NotFoundException,
+  BadRequestException,
+} from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { User } from './user.entity';
@@ -8,39 +13,81 @@ import * as bcrypt from 'bcrypt';
 export class UsersService {
   constructor(
     @InjectRepository(User)
-    private usersRepository: Repository<User>, // TypeORM repository
+    private repo: Repository<User>,
   ) {}
 
   // Yangi foydalanuvchi yaratish
   async create(data: Partial<User>): Promise<User> {
-    // Email allaqachon bormi?
-    const exists = await this.usersRepository.findOne({
-      where: { email: data.email },
-    });
-    if (exists) {
-      throw new ConflictException('Bu email allaqachon ro\'yxatdan o\'tgan');
+
+    if (!data.email) {
+      throw new BadRequestException('Email required');
     }
 
-    // Parolni hash qilish (bcrypt)
-    const hashedPassword = await bcrypt.hash(data.password as string, 10);
+    if (!data.password) {
+      throw new BadRequestException('Password required');
+    }
 
-    const user = this.usersRepository.create({
+    const exists = await this.repo.findOne({
+      where: { email: data.email },
+    });
+
+    if (exists) {
+      throw new ConflictException("Bu email allaqachon ro'yxatdan o'tgan");
+    }
+
+    // parolni hash qilish
+    const hashedPassword = await bcrypt.hash(data.password, 10);
+
+    const user = this.repo.create({
       ...data,
       password: hashedPassword,
     });
 
-    return this.usersRepository.save(user);
+    return await this.repo.save(user);
   }
 
-  // Email bo'yicha topish
-  async findByEmail(email: string): Promise<User | null> {
-    return this.usersRepository.findOne({ where: { email } });
-  }
+  // Email orqali topish (login uchun password bilan)
+  async findByEmailWithPassword(email: string): Promise<User | null> {
+    const user = await this.repo
+      .createQueryBuilder('user')
+      .addSelect('user.password')
+      .where('user.email = :email', { email })
+      .getOne();
 
-  // ID bo'yicha topish
-  async findById(id: string): Promise<User> {
-    const user = await this.usersRepository.findOne({ where: { id } });
-    if (!user) throw new NotFoundException('Foydalanuvchi topilmadi');
     return user;
+  }
+
+  // ID bo‘yicha topish
+  async findById(id: string): Promise<User> {
+    const user = await this.repo.findOne({
+      where: { id },
+    });
+
+    if (!user) {
+      throw new NotFoundException('Foydalanuvchi topilmadi');
+    }
+
+    return user;
+  }
+
+  // Barcha foydalanuvchilar
+  async findAll(): Promise<User[]> {
+    return await this.repo.find({
+      order: { createdAt: 'DESC' },
+    });
+  }
+
+  // Profil yangilash
+  async update(id: string, data: Partial<User>): Promise<User> {
+
+    const user = await this.findById(id);
+
+    if (data.password) {
+      data.password = await bcrypt.hash(data.password, 10);
+    }
+
+    Object.assign(user, data);
+
+    return await this.repo.save(user);
   }
 }

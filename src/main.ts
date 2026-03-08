@@ -8,26 +8,63 @@ async function bootstrap() {
 
   app.useGlobalPipes(
     new ValidationPipe({
-      whitelist: true,       // DTO da yo'q fieldlarni o'chiradi
-      forbidNonWhitelisted: true, // ruxsatsiz fieldlar xato qaytaradi
-      transform: true,       // string -> number kabi o'giradi
+      whitelist: true,            
+      forbidNonWhitelisted: true, 
+      transform: true,        
     }),
   );
 
   app.enableCors();
 
+  app.setGlobalPrefix('api/v1');
+
   const config = new DocumentBuilder()
-    .setTitle('Ishga Joylashish Platformasi API')
-    .setDescription('hh.uz ga o\'xshash platforma — Auth moduli')
+    .setTitle('Xorazm Jobs API')
+    .setDescription(
+      `
+## Xorazm viloyati uchun ishga joylashish platformasi
+
+### Asosiy funksiyalar:
+- 👤 **Auth** — ro'yxatdan o'tish, kirish, profil
+- 🏢 **Kompaniyalar** — yaratish, tahrirlash, ko'rish
+- 💼 **Vakansiyalar** — e'lon berish, qidirish, filtrlash  
+- 📄 **Rezyumeler** — yaratish, ko'rish
+- 🏷️ **Kategoriyalar** — IT, qurilish, tibbiyot va boshqalar
+
+### Autentifikatsiya:
+1. \`POST /api/v1/auth/register\` — ro'yxatdan o'ting
+2. \`POST /api/v1/auth/login\` — token oling
+3. "Authorize" tugmasini bosing va tokenni kiriting: \`Bearer <token>\`
+      `,
+    )
     .setVersion('1.0')
-    .addBearerAuth() 
+    .addBearerAuth(
+      { type: 'http', scheme: 'bearer', bearerFormat: 'JWT' },
+      'JWT',
+    )
+    .addTag('Auth', 'Autentifikatsiya va avtorizatsiya')
+    .addTag('Users', 'Foydalanuvchilar')
+    .addTag('Companies', 'Kompaniyalar')
+    .addTag('Vacancies', 'Vakansiyalar (ish o\'rinlari)')
+    .addTag('Resumes', 'Rezyumeler')
+    .addTag('Categories', 'Ish kategoriyalari')
     .build();
 
   const document = SwaggerModule.createDocument(app, config);
-  SwaggerModule.setup('api/docs', app, document); 
+  SwaggerModule.setup('api/docs', app, document, {
+    swaggerOptions: {
+      persistAuthorization: true, // Sahifani yangilaganda token saqlanadi
+    },
+  });
 
-  await app.listen(3000);
-   console.log('🚀 Server ishga tushdi: http://localhost:3000');
-  console.log('📄 documentation link: http://localhost:3000/api/docs');
+  const port = process.env.PORT || 3000;
+  await app.listen(port);
+
+  console.log('\n========================================');
+  console.log(`🚀  Server:  http://localhost:${port}`);
+  console.log(`📄  Swagger: http://localhost:${port}/api/docs`);
+  console.log(`🌐  API:     http://localhost:${port}/api/v1`);
+  console.log('========================================\n');
 }
+
 bootstrap();

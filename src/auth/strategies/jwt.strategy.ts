@@ -4,7 +4,6 @@ import { ExtractJwt, Strategy } from 'passport-jwt';
 import { ConfigService } from '@nestjs/config';
 import { UsersService } from '../../users/users.service';
 
-// JWT tokenni tekshirish strategiyasi
 @Injectable()
 export class JwtStrategy extends PassportStrategy(Strategy) {
   constructor(
@@ -12,16 +11,18 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
     private usersService: UsersService,
   ) {
     super({
+      // Token "Authorization: Bearer <token>" headerdan olinadi
       jwtFromRequest: ExtractJwt.fromAuthHeaderAsBearerToken(),
-      secretOrKey: config.get('JWT_SECRET') as string,
+      secretOrKey: config.get('JWT_SECRET', 'default_secret'),
     });
   }
 
+  // Token valid bo'lsa bu method chaqiriladi, qaytgan qiymat req.user ga tushadi
   async validate(payload: { sub: string; email: string; role: string }) {
     const user = await this.usersService.findById(payload.sub);
     if (!user || !user.isActive) {
-      throw new UnauthorizedException('Token yaroqsiz');
+      throw new UnauthorizedException('Token yaroqsiz yoki foydalanuvchi bloklangan');
     }
-    return user; 
+    return user;
   }
 }

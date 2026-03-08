@@ -1,10 +1,12 @@
-import {
-  Injectable,
-  UnauthorizedException,
-} from '@nestjs/common';
+import { Injectable, UnauthorizedException } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { UsersService } from '../users/users.service';
-import { RegisterDto, LoginDto, AuthResponseDto } from './dto/auth.dto';
+import {
+  RegisterDto,
+  LoginDto,
+  ChangePasswordDto,
+  AuthResponseDto,
+} from './dto/auth.dto';
 import * as bcrypt from 'bcrypt';
 
 @Injectable()
@@ -16,11 +18,9 @@ export class AuthService {
 
   // Ro'yxatdan o'tish
   async register(dto: RegisterDto): Promise<AuthResponseDto> {
-    // Yangi user yaratish (usersService ichida hash bo'ladi)
     const user = await this.usersService.create(dto);
 
-    // JWT token yaratish
-    const token = this.generateToken(user.id, user.email, user.role);
+    const token = this.makeToken(user.id, user.email, user.role);
 
     return {
       accessToken: token,
@@ -30,31 +30,32 @@ export class AuthService {
         firstName: user.firstName,
         lastName: user.lastName,
         role: user.role,
+        city: user.city,
       },
     };
   }
 
-  // Kirish
+  // Login
   async login(dto: LoginDto): Promise<AuthResponseDto> {
-    // 1. Email bo'yicha userni topish
-    const user = await this.usersService.findByEmail(dto.email);
+    const user = await this.usersService.findByEmailWithPassword(dto.email);
+
     if (!user) {
-      throw new UnauthorizedException('Email yoki parol noto\'g\'ri');
+      throw new UnauthorizedException("Email yoki parol noto'g'ri");
     }
 
-    // 2. Parolni tekshirish
-    const isPasswordValid = await bcrypt.compare(dto.password, user.password);
-    if (!isPasswordValid) {
-      throw new UnauthorizedException('Email yoki parol noto\'g\'ri');
+    const isMatch = await bcrypt.compare(dto.password, user.password);
+
+    if (!isMatch) {
+      throw new UnauthorizedException("Email yoki parol noto'g'ri");
     }
 
-    // 3. Faolmi?
     if (!user.isActive) {
-      throw new UnauthorizedException('Hisobingiz bloklangan');
+      throw new UnauthorizedException(
+        "Hisobingiz bloklangan. Admin bilan bog'laning.",
+      );
     }
 
-    // 4. Token yaratish
-    const token = this.generateToken(user.id, user.email, user.role);
+    const token = this.makeToken(user.id, user.email, user.role);
 
     return {
       accessToken: token,
@@ -64,22 +65,52 @@ export class AuthService {
         firstName: user.firstName,
         lastName: user.lastName,
         role: user.role,
+        city: user.city,
       },
     };
   }
 
-  // Mening profilim (token orqali)
+  // Profil (me)
   async getMe(userId: string) {
     const user = await this.usersService.findById(userId);
-    // Parolni javobda qaytarmaymiz!
-    const { password, ...result } = user;
-    return result;
+
+    const { password, ...safeUser } = user as any;
+
+    return safeUser;
   }
 
-  // Token yaratish — private helper
-  private generateToken(userId: string, email: string, role: string): string {
-    // Bu ma'lumotlar token ichiga saqlanadi (payload)
-    const payload = { sub: userId, email, role };
-    return this.jwtService.sign(payload);
+  // Parolni o'zgartirish
+  async changePassword(userId: string, dto: ChangePasswordDto) {
+
+    const user = await this.usersService.findById(userId);
+
+    const fullUser = await this.usersService.findByEmailWithPassword(user.email);
+
+    if (!fullUser) {
+      throw new UnauthorizedException("User topilmadi");
+    }
+
+    const isMatch = await bcrypt.compare(dto.oldPassword, fullUser.password);
+
+    if (!isMatch) {
+      throw new UnauthorizedException("Eski parol noto'g'ri");
+    }
+
+    const newHash = await bcrypt.hash(dto.newPassword, 10);
+
+    await this.usersService.update(userId, {
+      password: newHash,
+    } as any);
+
+    return { message: "Parol muvaffaqiyatli o'zgartirildi" };
+  }
+
+  // JWT token yaratish
+  private makeToken(userId: string, email: string, role: string): string {
+    return this.jwtService.sign({
+      sub: userId,
+      email,
+      role,
+    });
   }
 }
